@@ -80,7 +80,7 @@ def find_support_lines(
                 distances = np.abs(y - y_pred)  # Distance from points to the line
                 variance = np.var(distances)
 
-                print(f"Variance for segment {segment}: {variance}")
+                # print(f"Variance for segment {segment}: {variance}")
 
                 # If variance exceeds 5, filter points
                 while variance > 5:
@@ -170,7 +170,7 @@ def find_resistance_lines(
                 distances = np.abs(y - y_pred)  # Distance from points to the line
                 variance = np.var(distances)
 
-                print(f"Variance for segment {segment}: {variance}")
+                # print(f"Variance for segment {segment}: {variance}")
 
                 # If variance exceeds 5, filter points
                 while variance > 5:
@@ -259,7 +259,6 @@ def main(csv_file):
     # Calculate indicators
     data["RSI"] = calculate_rsi(data)
     support_levels, resistance_levels = find_levels(data)
-
     # Create base plots
     additional_plots = []
 
@@ -350,4 +349,4 @@ def main(csv_file):
 
 # Run the analysis
 if __name__ == "__main__":
-    main("IGL.csv")
+    main("./csv_data/GPPL.csv")
