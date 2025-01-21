@@ -21,7 +21,7 @@ def clean_csv(csv_file_path, output_file_path):
 
 
 # Example usage
-# csv_file_path = "GPPL.csv"  # Input file path
-# output_file_path = "GPPL_cleaned.csv"  # Output file path
+# csv_file_path = "IGL.csv"  # Input file path
+# output_file_path = "IGL.csv"  # Output file path
 
 # clean_csv(csv_file_path, output_file_path)

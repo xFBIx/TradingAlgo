@@ -41,7 +41,7 @@ def filter_significant_points(points, price_threshold=0.02, time_threshold=5):
     return filtered
 
 
-def find_trend_lines(
+def find_support_lines(
     x_values, y_values, min_points=3, r2_threshold=0.95, min_slope=0.001
 ):
     """
@@ -52,10 +52,10 @@ def find_trend_lines(
     if len(valid_points) < min_points:
         return []
 
-    x_values = [p[0] for p in valid_points]
-    y_values = [p[1] for p in valid_points]
+    x_values = np.array([p[0] for p in valid_points]).reshape(-1, 1)
+    y_values = np.array([p[1] for p in valid_points])
 
-    points = list(zip(x_values, y_values))
+    points = list(zip(x_values.flatten(), y_values))
     lines = []
 
     for i in range(len(points) - min_points + 1):
@@ -73,7 +73,136 @@ def find_trend_lines(
             slope = abs(model.coef_[0])
 
             if r2 > r2_threshold and slope > min_slope:
-                lines.append((segment, model, r2))
+                # Calculate the predicted y values
+                y_pred = model.predict(x)
+
+                # Calculate the perpendicular distances
+                distances = np.abs(y - y_pred)  # Distance from points to the line
+                variance = np.var(distances)
+
+                print(f"Variance for segment {segment}: {variance}")
+
+                # If variance exceeds 5, filter points
+                while variance > 5:
+                    # Identify the point with the maximum distance above the line
+                    above_line_points = [
+                        (p[0], p[1]) for p in segment if p[1] > y_pred[segment.index(p)]
+                    ]
+                    if not above_line_points:
+                        break  # No points above the line to remove
+
+                    # Find the point with the maximum distance
+                    farthest_point = max(
+                        above_line_points,
+                        key=lambda p: abs(p[1] - y_pred[segment.index(p)]),
+                    )
+                    segment.remove(farthest_point)
+
+                    # Recalculate x and y for the new segment
+                    x = np.array([p[0] for p in segment]).reshape(-1, 1)
+                    y = np.array([p[1] for p in segment])
+
+                    if len(x) < min_points:
+                        break
+
+                    model.fit(x, y)
+                    y_pred = model.predict(x)
+                    distances = np.abs(y - y_pred)
+                    variance = np.var(distances)
+
+                # After filtering, check if we still have enough points
+                if len(segment) >= min_points:
+                    lines.append((segment, model, r2))
+
+    # Filter overlapping lines
+    if not lines:
+        return []
+
+    lines.sort(key=lambda x: (len(x[0]), x[2]), reverse=True)
+    filtered_lines = []
+    used_points = set()
+
+    for line, model, r2 in lines:
+        points_set = set(point[0] for point in line)
+        if not points_set.intersection(used_points):
+            filtered_lines.append((line, model))
+            used_points.update(points_set)
+
+    return filtered_lines
+
+
+def find_resistance_lines(
+    x_values, y_values, min_points=3, r2_threshold=0.95, min_slope=0.001
+):
+    """
+    Find trend lines with improved filtering and validation
+    """
+    # Convert inputs to numpy arrays and remove NaN values
+    valid_points = [(x, y) for x, y in zip(x_values, y_values) if not np.isnan(y)]
+    if len(valid_points) < min_points:
+        return []
+
+    x_values = np.array([p[0] for p in valid_points]).reshape(-1, 1)
+    y_values = np.array([p[1] for p in valid_points])
+
+    points = list(zip(x_values.flatten(), y_values))
+    lines = []
+
+    for i in range(len(points) - min_points + 1):
+        for j in range(i + min_points, len(points) + 1):
+            segment = points[i:j]
+            x = np.array([p[0] for p in segment]).reshape(-1, 1)
+            y = np.array([p[1] for p in segment])
+
+            if len(x) < min_points:
+                continue
+
+            model = LinearRegression()
+            model.fit(x, y)
+            r2 = model.score(x, y)
+            slope = abs(model.coef_[0])
+
+            if r2 > r2_threshold and slope > min_slope:
+                # Calculate the predicted y values
+                y_pred = model.predict(x)
+
+                # Calculate the perpendicular distances
+                distances = np.abs(y - y_pred)  # Distance from points to the line
+                variance = np.var(distances)
+
+                print(f"Variance for segment {segment}: {variance}")
+
+                # If variance exceeds 5, filter points
+                while variance > 5:
+                    # Identify the point with the maximum distance below the line
+                    below_line_points = [
+                        (p[0], p[1]) for p in segment if p[1] < y_pred[segment.index(p)]
+                    ]
+                    if not below_line_points:
+                        break  # No points below the line to remove
+
+                    # Find the point with the maximum distance
+                    farthest_point = max(
+                        below_line_points,
+                        key=lambda p: abs(p[1] - y_pred[segment.index(p)]),
+                    )
+                    segment.remove(farthest_point)
+
+                    # Recalculate x and y for the new segment
+                    x = np.array([p[0] for p in segment]).reshape(-1, 1)
+                    y = np.array([p[1] for p in segment])
+
+                    if len(x) < min_points:
+                        break
+
+                    model.fit(x, y)
+                    y_pred = model.predict(x)
+                    distances = np.abs(y - y_pred)
+                    variance = np.var(distances)
+
+                # After filtering, check if we still have enough points
+                if len(segment) >= min_points:
+                    lines.append((segment, model, r2))
 
     # Filter overlapping lines
     if not lines:
@@ -175,7 +304,7 @@ def main(csv_file):
 
     # Find and add trend lines only if enough points exist
     if len(support_points) >= 3:
-        support_lines = find_trend_lines(
+        support_lines = find_support_lines(
             [p[0] for p in support_points],
             [p[1] for p in support_points],
             min_points=3,
@@ -191,7 +320,7 @@ def main(csv_file):
             additional_plots.append(support_trend)
 
     if len(resistance_points) >= 3:
-        resistance_lines = find_trend_lines(
+        resistance_lines = find_resistance_lines(
             [p[0] for p in resistance_points],
             [p[1] for p in resistance_points],
             min_points=3,
@@ -221,4 +350,4 @@ def main(csv_file):
 
 # Run the analysis
 if __name__ == "__main__":
-    main("GPPL.csv")
+    main("IGL.csv")
