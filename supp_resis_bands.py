@@ -1,6 +1,7 @@
 import pandas as pd
 import mplfinance as mpf
 import numpy as np
+import yfinance as yf
 from sklearn.linear_model import LinearRegression
 from itertools import combinations
 
@@ -250,11 +251,12 @@ def create_plot_data(data, trend_lines, is_support=True):
     return plot_data if valid_data else None
 
 
-def main(csv_file):
-    # Load and process data
-    stock_name = csv_file.split(".")[0]
-    data = pd.read_csv(csv_file, index_col="Date", parse_dates=True)
-    data.sort_index(ascending=True, inplace=True)
+def main(symbol, start_date, end_date, interval="1d"):
+
+    # Load and process data using yfinance
+    ticker = yf.Ticker(symbol)
+    stock_name = ticker.info["longName"]
+    data = ticker.history(start=start_date, end=end_date, interval=interval)
 
     # Calculate indicators
     data["RSI"] = calculate_rsi(data)
@@ -349,4 +351,6 @@ def main(csv_file):
 
 # Run the analysis
 if __name__ == "__main__":
-    main("./csv_data/GPPL.csv")
+    main(
+        symbol="GPPL.NS", start_date="2023-01-01", end_date="2024-01-01", interval="1d"
+    )
