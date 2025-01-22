@@ -1,14 +1,13 @@
 import pandas as pd
 import mplfinance as mpf
 import numpy as np
+import yfinance as yf
 from data_manupulation import clean_csv
 
-# Load and clean CSV file
-csv_file = "GPPL.csv"
-stock_name = csv_file.split(".")[0]
-clean_csv(csv_file, csv_file)
-data = pd.read_csv(csv_file, index_col="Date", parse_dates=True)
-data.sort_index(ascending=True, inplace=True)
+# Load and process data using yfinance
+ticker = yf.Ticker("GPPL.NS")
+stock_name = ticker.info["longName"]
+data = ticker.history(start="2023-01-01", end="2024-01-01", interval="1d")
 
 
 # Calculate RSI

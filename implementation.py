@@ -1,10 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import yfinance as yf
 from supp_resis_bands import calculate_rsi
 
-data = pd.read_csv("./csv_data/GPPL.csv", index_col="Date", parse_dates=True)
-data.sort_index(ascending=True, inplace=True)
+# Load and process data using yfinance
+ticker = yf.Ticker("GPPL.NS")
+stock_name = ticker.info["longName"]
+data = ticker.history(start="2023-01-01", end="2024-01-01", interval="1d")
 
 # Calculate indicators
 data["RSI"] = calculate_rsi(data)
@@ -21,7 +23,7 @@ below_30 = rsi_series < 30
 
 # Track subsequent numbers and draw a vertical line when RSI goes above 30
 for i in range(1, len(rsi_series)):
-    if below_30[i-1]:
+    if below_30[i - 1]:
         # Check if subsequent values remain within the range of 25.0 to 35.0
         if all(25.0 <= rsi_series[j] <= 35.0 for j in range(i, len(rsi_series))):
             continue  # Skip drawing if all subsequent values are within the range
@@ -30,7 +32,12 @@ for i in range(1, len(rsi_series)):
             for j in range(i, len(rsi_series)):
                 if rsi_series[j] > 35:
                     # Draw a red line on the last day that has the float value greater than 35
-                    plt.axvline(x=rsi_series.index[j-1], color='red', linestyle='--', linewidth=0.5)
+                    plt.axvline(
+                        x=rsi_series.index[j - 1],
+                        color="red",
+                        linestyle="--",
+                        linewidth=0.5,
+                    )
                     break  # Stop tracking after the first increase
 
 
@@ -50,7 +57,10 @@ def track_drops_and_rsi(series):
                     # Check if the current RSI is more than 5 greater than the previous RSI
                     if current_rsi > previous_rsi + 5:
                         plt.axvline(
-                            x=series.index[j], color="green", linestyle="--", linewidth=0.5
+                            x=series.index[j],
+                            color="green",
+                            linestyle="--",
+                            linewidth=0.5,
                         )
                         green_line_drawn = True  # Set the state variable to True
                         break  # Stop tracking after the first valid increase
@@ -58,13 +68,18 @@ def track_drops_and_rsi(series):
                     # If we don't have data for the next value, we can also print a line
                     if j == len(series) - 1:
                         plt.axvline(
-                            x=series.index[j], color="green", linestyle="--", linewidth=0.5
+                            x=series.index[j],
+                            color="green",
+                            linestyle="--",
+                            linewidth=0.5,
                         )
                         green_line_drawn = True  # Set the state variable to True
                         break  # Stop tracking after the last value
 
                     # If the increase is within 5, we ignore it
-                    previous_rsi = current_rsi  # Update previous_rsi for the next iteration
+                    previous_rsi = (
+                        current_rsi  # Update previous_rsi for the next iteration
+                    )
 
         # Reset the state variable if a new drop is detected after a green line was drawn
         if green_line_drawn and series[i] - series[i + 7] < 20:
