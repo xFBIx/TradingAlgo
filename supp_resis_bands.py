@@ -352,5 +352,8 @@ def main(symbol, start_date, end_date, interval="1d"):
 # Run the analysis
 if __name__ == "__main__":
     main(
-        symbol="GPPL.NS", start_date="2023-01-01", end_date="2024-01-01", interval="1d"
+        symbol="TATASTEEL.NS",
+        start_date="2023-01-01",
+        end_date="2025-01-22",
+        interval="1d",
     )

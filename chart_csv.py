@@ -7,7 +7,7 @@ from data_manupulation import clean_csv
 # Load and process data using yfinance
 ticker = yf.Ticker("GPPL.NS")
 stock_name = ticker.info["longName"]
-data = ticker.history(start="2023-01-01", end="2024-01-01", interval="1d")
+data = ticker.history(start="2023-01-01", end="2025-01-22", interval="1d")
 
 
 # Calculate RSI
