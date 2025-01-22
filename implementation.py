@@ -21,8 +21,17 @@ below_30 = rsi_series < 30
 
 # Track subsequent numbers and draw a vertical line when RSI goes above 30
 for i in range(1, len(rsi_series)):
-    if below_30[i - 1] and rsi_series[i] > 30:
-        plt.axvline(x=rsi_series.index[i], color="red", linestyle="--", linewidth=0.5)
+    if below_30[i-1]:
+        # Check if subsequent values remain within the range of 25.0 to 35.0
+        if all(25.0 <= rsi_series[j] <= 35.0 for j in range(i, len(rsi_series))):
+            continue  # Skip drawing if all subsequent values are within the range
+        else:
+            # Track until we find a value greater than 35
+            for j in range(i, len(rsi_series)):
+                if rsi_series[j] > 35:
+                    # Draw a red line on the last day that has the float value greater than 35
+                    plt.axvline(x=rsi_series.index[j-1], color='red', linestyle='--', linewidth=0.5)
+                    break  # Stop tracking after the first increase
 
 
 # Function to track drops of 20 or more within 7 consecutive values
