@@ -2,103 +2,111 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
 from supp_resis_bands import calculate_rsi
-
-# Load and process data using yfinance
-ticker = yf.Ticker("GPPL.NS")
-stock_name = ticker.info["longName"]
-print(ticker.info)
-data = ticker.history(start="2023-01-01", end="2025-01-22", interval="1d")
-
-# Calculate indicators
-data["RSI"] = calculate_rsi(data)
-
-# Assuming the RSI values are in a column named 'RSI'
-rsi_series = data["RSI"]
-
-# Create a figure and axis for plotting
-plt.figure(figsize=(12, 6))
-plt.plot(rsi_series.index, rsi_series, label="RSI", color="blue")
-
-# Identify points where RSI is below 30
-below_30 = rsi_series < 30
-
-# Track subsequent numbers and draw a vertical line when RSI goes above 30
-for i in range(1, len(rsi_series)):
-    if below_30[i - 1]:
-        # Check if subsequent values remain within the range of 25.0 to 35.0
-        if all(25.0 <= rsi_series[j] <= 35.0 for j in range(i, len(rsi_series))):
-            continue  # Skip drawing if all subsequent values are within the range
-        else:
-            # Track until we find a value greater than 35
-            for j in range(i, len(rsi_series)):
-                if rsi_series[j] > 35:
-                    # Draw a red line on the last day that has the float value greater than 35
-                    plt.axvline(
-                        x=rsi_series.index[j - 1],
-                        color="red",
-                        linestyle="--",
-                        linewidth=0.5,
-                    )
-                    break  # Stop tracking after the first increase
+from datetime import datetime
 
 
-# Function to track drops of 20 or more within 7 consecutive values
-def track_drops_and_rsi(series):
-    green_line_drawn = False  # State variable to track if a green line has been drawn
+def analyze_rsi_triggers(symbol, start_date, end_date, interval="1d"):
+    """
+    Analyze RSI triggers for oversold conditions and significant drops
 
-    for i in range(len(series) - 7):
-        # Check for a drop of 20 or more within the next 7 values
-        if series[i] - series[i + 7] >= 20:
-            # Only track RSI if a green line has not been drawn
-            if not green_line_drawn:
-                previous_rsi = series[i + 7]
-                for j in range(i + 8, len(series)):
-                    current_rsi = series[j]
+    Parameters:
+    symbol (str): Stock symbol with exchange (e.g., 'GPPL.NS')
+    start_date (str): Start date in 'YYYY-MM-DD' format
+    end_date (str): End date in 'YYYY-MM-DD' format
+    interval (str): Data interval
 
-                    # Check if the current RSI is more than 5 greater than the previous RSI
+    Returns:
+    tuple: Set of trigger dates and DataFrame with RSI values
+    """
+    # Load and process data using yfinance
+    ticker = yf.Ticker(symbol)
+    data = ticker.history(start=start_date, end=end_date, interval=interval)
+
+    # Calculate RSI
+    data["RSI"] = calculate_rsi(data)
+    rsi_series = data["RSI"]
+
+    # Use a set to store unique trigger dates
+    trigger_dates = set()
+
+    def check_oversold_condition():
+        """Check for RSI below 30 and subsequent movement"""
+        below_30 = rsi_series < 30
+
+        for i in range(1, len(rsi_series)):
+            if below_30[i - 1]:
+                # Skip if in consolidation range (25-35)
+                subsequent_values = rsi_series[i:]
+                if all(25.0 <= val <= 35.0 for val in subsequent_values):
+                    continue
+
+                # Find first value above 35
+                for j in range(i, len(rsi_series)):
+                    if rsi_series[j] > 35:
+                        trigger_date = rsi_series.index[j - 1]
+                        trigger_dates.add(trigger_date)
+                        break
+
+    def check_sharp_drops():
+        """Check for drops of 20 or more within 7 consecutive values"""
+        processed_drops = set()  # Track processed drop periods
+
+        for i in range(len(rsi_series) - 7):
+            drop_end_idx = i + 7
+
+            # Check if this period has been processed
+            if drop_end_idx in processed_drops:
+                continue
+
+            # Check for drop of 20 or more
+            if rsi_series[i] - rsi_series[drop_end_idx] >= 20:
+                previous_rsi = rsi_series[drop_end_idx]
+
+                # Mark this drop period as processed
+                processed_drops.add(drop_end_idx)
+
+                # Look for recovery (increase of more than 5)
+                for j in range(drop_end_idx + 1, len(rsi_series)):
+                    current_rsi = rsi_series[j]
+
                     if current_rsi > previous_rsi + 5:
-                        plt.axvline(
-                            x=series.index[j],
-                            color="green",
-                            linestyle="--",
-                            linewidth=0.5,
-                        )
-                        green_line_drawn = True  # Set the state variable to True
-                        break  # Stop tracking after the first valid increase
+                        trigger_dates.add(rsi_series.index[j])
+                        break
 
-                    # If we don't have data for the next value, we can also print a line
-                    if j == len(series) - 1:
-                        plt.axvline(
-                            x=series.index[j],
-                            color="green",
-                            linestyle="--",
-                            linewidth=0.5,
-                        )
-                        green_line_drawn = True  # Set the state variable to True
-                        break  # Stop tracking after the last value
+                    # Handle end of data
+                    if j == len(rsi_series) - 1:
+                        trigger_dates.add(rsi_series.index[j])
+                        break
 
-                    # If the increase is within 5, we ignore it
-                    previous_rsi = (
-                        current_rsi  # Update previous_rsi for the next iteration
-                    )
+                    previous_rsi = current_rsi
 
-        # Reset the state variable if a new drop is detected after a green line was drawn
-        if green_line_drawn and series[i] - series[i + 7] < 20:
-            green_line_drawn = False  # Reset to allow tracking again
+    # Run both analyses
+    check_oversold_condition()
+    check_sharp_drops()
+
+    # Convert dates to datetime for consistent formatting
+    trigger_dates = {pd.to_datetime(date) for date in trigger_dates}
+
+    # Sort trigger dates for better readability
+    sorted_trigger_dates = sorted(trigger_dates)
+
+    return sorted_trigger_dates, data
 
 
-# Call the function to track drops and increases
-track_drops_and_rsi(rsi_series)
+# Example usage
+if __name__ == "__main__":
+    trigger_dates, data = analyze_rsi_triggers(
+        symbol="GPPL.NS", start_date="2024-01-01", end_date="2025-01-22"
+    )
 
-# Add a horizontal line at RSI = 30 for reference
-plt.axhline(y=30, color="red", linestyle="--", label="RSI = 30")
+    print("\nUnique Trigger Dates:")
+    for date in trigger_dates:
+        print(f"- {date.strftime('%Y-%m-%d')}")
 
-# Add labels and title
-plt.title("RSI with Vertical Lines for Crossings and Increases")
-plt.xlabel("Date")
-plt.ylabel("RSI")
-plt.legend()
-plt.grid()
+    print(f"\nTotal unique triggers found: {len(trigger_dates)}")
 
-# Show the plot
-plt.show()
+    # Optional: Print RSI values on trigger dates
+    # print("\nRSI values on trigger dates:")
+    # for date in trigger_dates:
+    #     rsi_value = data.loc[date, "RSI"]
+    #     print(f"- {date.strftime('%Y-%m-%d')}: RSI = {rsi_value:.2f}")
